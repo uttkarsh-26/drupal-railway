@@ -16,8 +16,8 @@ UI" steps, no hardcoded credentials.
 
 ## How first boot works
 
-1. Entrypoint creates the persistent directories (`sites/default/files`,
-   `sites/default/files/config/sync`) and protects the config-sync dir.
+1. Entrypoint creates public files and private state directories under the
+   `/data` volume. Only `/data/files` is symlinked into Drupal's web root.
 2. It polls PostgreSQL until reachable (`DB_WAIT_TIMEOUT`, default 120s).
 3. The installer (`installer.php`) takes a Postgres advisory lock, checks
    whether Drupal's schema exists, and runs `drush site:install` only if
@@ -86,10 +86,9 @@ contributed cron jobs that read uploads also need access to the files volume.
 3. Add PostgreSQL: **+ New → Database → Add PostgreSQL**. Reference its private
    URL from the web service as `DATABASE_URL=${{Postgres.DATABASE_URL}}`
    (replace `Postgres` if you renamed the database service).
-4. Add a **volume** to the web service mounted at
-   `/opt/drupal/web/sites/default/files` (persistent uploads, config export,
-   and the auto-generated hash salt). Without it, uploaded files are lost on
-   redeploy.
+4. Add a **volume** to the web service mounted at `/data` (persistent uploads,
+   private config export, and the auto-generated hash salt). Without it,
+   uploaded files are lost on redeploy.
 5. Add at least `DRUPAL_ACCOUNT_PASS` as a generated secret
    (`${{secret(48)}}` in the template editor, or generate one locally with
    `openssl rand -hex 24`). Add the other variables you want (table below).
@@ -135,7 +134,7 @@ contributed cron jobs that read uploads also need access to the files volume.
    - Generate `DRUPAL_ACCOUNT_PASS` with `${{secret(48)}}`; do not use a
      shared default or require users to invent one before first deploy.
    - Add optional defaults such as `DRUPAL_SITE_NAME`.
-   - Volume: mount `/opt/drupal/web/sites/default/files` (persistent files).
+   - Volume: mount `/data` (public files plus private operational state).
    - Healthcheck path: `/health.php` (already in `railway.toml`).
 5. **Create Template**, then share the template URL. Publishing to the
    marketplace also makes open-source templates eligible for Railway's
@@ -146,9 +145,9 @@ contributed cron jobs that read uploads also need access to the files volume.
 - **No committed secrets.** `.env.example` holds placeholders only, there is
   no fixed admin password, and first boot fails fast when
   `DRUPAL_ACCOUNT_PASS` is missing.
-- The generated hash salt is persisted under
-  `sites/default/files/.drupal-railway/` with HTTP access denied; the smoke
-  test proves it cannot be downloaded.
+- The generated hash salt and config export are persisted under `/data/state`
+  and `/data/config`, outside the web root. Only `/data/files` is exposed via a
+  symlink for public uploads; the smoke test enforces this boundary.
 - **Locked, audited dependencies.** The image build and smoke test fail if
   Composer reports a production advisory. The lock currently includes Guzzle
   7.15.3, fixing the advisories present in the upstream Drupal image lock.

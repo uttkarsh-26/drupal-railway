@@ -119,9 +119,11 @@ ok "locked dependencies validate and pass security audit (Guzzle $guzzle_version
 
 "${COMPOSE[@]}" run --rm --no-deps \
   -e PORT=8081 -e DRUPAL_SKIP_DB_WAIT=1 -e DRUPAL_SKIP_INSTALL=1 \
-  web sh -c "grep -qx 'Listen 8081' /etc/apache2/ports.conf && grep -q '<VirtualHost \*:8081>' /etc/apache2/sites-available/000-default.conf" \
+  web sh -c "grep -qx 'Listen 8081' /etc/apache2/ports.conf \
+    && grep -q '<VirtualHost \*:8081>' /etc/apache2/sites-available/000-default.conf \
+    && PORT=8082 /usr/local/bin/drupal-railway-entrypoint sh -c \"grep -qx 'Listen 8082' /etc/apache2/ports.conf && grep -q '<VirtualHost \\*:8082>' /etc/apache2/sites-available/000-default.conf\"" \
   >/dev/null || fail "entrypoint did not adapt Apache to PORT=8081"
-ok "entrypoint adapts Apache to Railway's dynamic PORT"
+ok "entrypoint repeatedly adapts Apache to Railway's dynamic PORT"
 
 "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
 "${COMPOSE[@]}" up -d db >/dev/null
@@ -200,14 +202,16 @@ ok "health endpoint leaks no secrets"
 log "phase 4/4: verifying persistence across web container recreation"
 marker="persistence-test-$(date +%s).txt"
 docker compose exec -T web sh -c "echo smoke > /opt/drupal/web/sites/default/files/$marker" || fail "could not write marker file"
-salt_path="/opt/drupal/web/sites/default/files/.drupal-railway/hash-salt"
+salt_path="/data/state/hash-salt"
 salt_before="$(docker compose exec -T web sha256sum "$salt_path" | cut -d' ' -f1)"
 [ -n "$salt_before" ] || fail "generated hash salt file is missing"
-salt_http="$(http_code /sites/default/files/.drupal-railway/hash-salt)"
-case "$salt_http" in
-  403|404) ;;
-  *) fail "hash salt was downloadable over HTTP $salt_http" ;;
+public_target="$(docker compose exec -T web readlink -f /opt/drupal/web/sites/default/files)"
+[ "$public_target" = "/data/files" ] || fail "public files symlink resolves to $public_target, expected /data/files"
+case "$salt_path" in
+  /opt/drupal/web/*) fail "hash salt is stored under the web root" ;;
 esac
+salt_http="$(http_code /data/state/hash-salt)"
+[ "$salt_http" = "404" ] || fail "private hash salt path returned HTTP $salt_http (expected 404)"
 "${COMPOSE[@]}" up -d --force-recreate web >/dev/null
 wait_for_installed
 docker compose exec -T web sh -c "test -f /opt/drupal/web/sites/default/files/$marker" || fail "marker file lost after web recreation"

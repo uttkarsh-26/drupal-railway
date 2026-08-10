@@ -35,7 +35,7 @@ services:
       DRUPAL_ACCOUNT_MAIL: admin@example.com
       DRUPAL_ACCOUNT_PASS: ${DRUPAL_ACCOUNT_PASS:?Set DRUPAL_ACCOUNT_PASS in .env or your shell (see README.md)}
     volumes:
-      - drupal-files:/opt/drupal/web/sites/default/files
+      - drupal-data:/data
     depends_on:
       db:
         condition: service_healthy
@@ -43,4 +43,4 @@ services:
 
 volumes:
   db-data:
-  drupal-files:
+  drupal-data:

@@ -116,9 +116,11 @@ function drupal_railway_hash_salt(string $app_root): string {
   if (is_string($salt) && $salt !== '') {
     return $salt;
   }
-  // The persistent files volume is inside the web root, so keep operational
-  // state in a dedicated directory protected by the entrypoint's .htaccess.
-  $file = $app_root . '/sites/default/files/.drupal-railway/hash-salt';
+  // Operational state must live outside the web root. Public uploads are a
+  // symlink into the same volume, but this sibling state directory is never
+  // reachable through Apache.
+  $persistent_root = getenv('DRUPAL_PERSISTENT_ROOT') ?: '/data';
+  $file = $persistent_root . '/state/hash-salt';
   if (is_file($file)) {
     $existing = trim((string) file_get_contents($file));
     if ($existing !== '') {

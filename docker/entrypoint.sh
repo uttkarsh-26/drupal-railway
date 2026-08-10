@@ -14,21 +14,16 @@ set -eu
 
 RAILWAY_DIR="${RAILWAY_DIR:-/opt/drupal-railway}"
 WEBROOT="${DRUPAL_WEBROOT:-/opt/drupal/web}"
-FILES_DIR="$WEBROOT/sites/default/files"
-CONFIG_SYNC_DIR="$FILES_DIR/config/sync"
-STATE_DIR="$FILES_DIR/.drupal-railway"
+PERSISTENT_ROOT="${DRUPAL_PERSISTENT_ROOT:-/data}"
+FILES_DIR="$PERSISTENT_ROOT/files"
+CONFIG_SYNC_DIR="$PERSISTENT_ROOT/config/sync"
+STATE_DIR="$PERSISTENT_ROOT/state"
 DB_WAIT_TIMEOUT="${DB_WAIT_TIMEOUT:-120}"
 
 log() { echo "[drupal-railway] $*"; }
 
 # --- 1. directories -----------------------------------------------------------
 mkdir -p "$FILES_DIR" "$CONFIG_SYNC_DIR" "$STATE_DIR"
-if [ ! -f "$CONFIG_SYNC_DIR/.htaccess" ]; then
-  printf 'Require all denied\n' >"$CONFIG_SYNC_DIR/.htaccess"
-fi
-if [ ! -f "$STATE_DIR/.htaccess" ]; then
-  printf 'Require all denied\n' >"$STATE_DIR/.htaccess"
-fi
 
 # --- 2. database wait ----------------------------------------------------------
 if [ "${DRUPAL_SKIP_DB_WAIT:-0}" = "1" ]; then
@@ -60,7 +55,7 @@ fi
 # every boot is cheap for typical sites and heals root-owned files created by
 # one-off provisioning (e.g. `docker compose run ... drush`).
 if [ "${DRUPAL_SKIP_CHOWN:-0}" != "1" ] && [ "$(id -u)" = "0" ]; then
-  chown -R www-data:www-data "$WEBROOT/sites/default" 2>/dev/null || true
+  chown -R www-data:www-data "$WEBROOT/sites/default" "$PERSISTENT_ROOT" 2>/dev/null || true
 fi
 
 # --- 5. port + start ----------------------------------------------------------------
@@ -72,8 +67,8 @@ if [ -n "${PORT:-}" ] && [ "$PORT" != "80" ]; then
       ;;
     *)
       log "configuring Apache to listen on PORT=$PORT"
-      sed -i "s/^Listen 80$/Listen ${PORT}/" /etc/apache2/ports.conf
-      sed -i "s/<VirtualHost \*:80>/<VirtualHost *:${PORT}>/" /etc/apache2/sites-available/000-default.conf
+      sed -E -i "s/^Listen [0-9]+$/Listen ${PORT}/" /etc/apache2/ports.conf
+      sed -E -i "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${PORT}>/" /etc/apache2/sites-available/000-default.conf
       ;;
   esac
 fi

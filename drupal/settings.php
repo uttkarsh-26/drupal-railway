@@ -69,9 +69,10 @@ if (getenv('DRUPAL_REVERSE_PROXY') === '1') {
 
 // ---- Files & configuration -----------------------------------------------------------
 $settings['file_public_path'] = 'sites/default/files';
-// Exported configuration lives on the persistent volume; the entrypoint
-// protects it with a .htaccess that denies all requests.
-$settings['config_sync_directory'] = $app_root . '/sites/default/files/config/sync';
+// Exported configuration stays on the persistent volume but outside the web
+// root so it can never be downloaded.
+$persistent_root = getenv('DRUPAL_PERSISTENT_ROOT') ?: '/data';
+$settings['config_sync_directory'] = $persistent_root . '/config/sync';
 
 // ---- Logging -----------------------------------------------------------------------------
 // Hide errors from visitors; they still land in the container logs.

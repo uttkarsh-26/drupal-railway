@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # drupal-railway: production-oriented Drupal 11 for Railway.
 # Base: official Drupal 11.4.4 / PHP 8.5 Apache image. The multi-architecture
 # digest prevents an upstream tag mutation from silently changing a build.
@@ -21,7 +19,8 @@ RUN composer install --no-dev --no-interaction --prefer-dist --no-progress --opt
     && composer clear-cache
 
 ENV PATH="/opt/drupal/vendor/bin:${PATH}" \
-    RAILWAY_DIR="/opt/drupal-railway"
+    RAILWAY_DIR="/opt/drupal-railway" \
+    DRUPAL_PERSISTENT_ROOT="/data"
 
 # Production PHP settings (memory, uploads, opcache, errors hidden).
 COPY drupal/php.ini /usr/local/etc/php/conf.d/30-drupal-railway.ini
@@ -39,10 +38,13 @@ COPY drupal/health.php /opt/drupal/web/health.php
 
 # Entrypoint: DB wait -> idempotent install -> Apache.
 COPY docker/entrypoint.sh /usr/local/bin/drupal-railway-entrypoint
-RUN chmod +x /usr/local/bin/drupal-railway-entrypoint
+RUN chmod +x /usr/local/bin/drupal-railway-entrypoint \
+    && mkdir -p /data/files \
+    && ln -s /data/files /opt/drupal/web/sites/default/files
 
-# Persistent user content. Mount a Railway volume at this path (see README).
-VOLUME ["/opt/drupal/web/sites/default/files"]
+# Persistent user content and private operational state. Public files are
+# exposed through the web-root symlink; salt/config state stays outside it.
+VOLUME ["/data"]
 
 EXPOSE 80
 
