@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1
+
+# drupal-railway: production-oriented Drupal 11 for Railway.
+# Base: official Drupal 11.4.4 / PHP 8.5 Apache image. The multi-architecture
+# digest prevents an upstream tag mutation from silently changing a build.
+FROM drupal:11.4.4-php8.5-apache-bookworm@sha256:24ff2791a2f83b96b3be248094295c7db9d32b314af7c612bb399496ce5918b1
+
+# Composer runs as root during the build and needs generous memory for
+# dependency resolution.
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_MEMORY_LIMIT=-1
+
+# Use the committed dependency lock instead of resolving packages during every
+# image build. The lock includes Drush and Guzzle >=7.15.3; the latter patches
+# the 2026 host/cookie/redirect advisories present in the upstream image lock.
+WORKDIR /opt/drupal
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader \
+    && composer validate --strict --no-check-publish \
+    && composer audit --locked --no-dev \
+    && composer clear-cache
+
+ENV PATH="/opt/drupal/vendor/bin:${PATH}" \
+    RAILWAY_DIR="/opt/drupal-railway"
+
+# Production PHP settings (memory, uploads, opcache, errors hidden).
+COPY drupal/php.ini /usr/local/etc/php/conf.d/30-drupal-railway.ini
+
+# Trust Railway's edge proxy so Drupal generates https:// URLs.
+COPY drupal/apache-https.conf /etc/apache2/conf-available/drupal-railway-https.conf
+RUN a2enconf drupal-railway-https
+
+# Runtime helpers live OUTSIDE the web root so they are never served.
+COPY drupal/env.inc.php drupal/check-db.php drupal/installer.php /opt/drupal-railway/
+
+# Drupal overlay: env-driven settings + lightweight health endpoint.
+COPY drupal/settings.php /opt/drupal/web/sites/default/settings.php
+COPY drupal/health.php /opt/drupal/web/health.php
+
+# Entrypoint: DB wait -> idempotent install -> Apache.
+COPY docker/entrypoint.sh /usr/local/bin/drupal-railway-entrypoint
+RUN chmod +x /usr/local/bin/drupal-railway-entrypoint
+
+# Persistent user content. Mount a Railway volume at this path (see README).
+VOLUME ["/opt/drupal/web/sites/default/files"]
+
+EXPOSE 80
+
+ENTRYPOINT ["drupal-railway-entrypoint"]
+CMD ["apache2-foreground"]

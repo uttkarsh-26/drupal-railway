@@ -1,0 +1,18 @@
+# Railway config-as-code.
+#
+# NOTE: this file covers build + deploy behavior only. Service variables and
+# the persistent files volume are configured in the Railway dashboard (or via
+# the CLI/API) — see README.md for the exact steps.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Railway waits for /health.php to return HTTP 200 before routing traffic.
+# The endpoint checks database reachability + Drupal install state and never
+# exposes credentials.
+healthcheckPath = "/health.php"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

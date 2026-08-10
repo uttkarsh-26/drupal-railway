@@ -1,0 +1,9 @@
+# Keep the Docker build context small and free of local secrets.
+.git
+.github
+.env
+.env.*
+test.sh
+README.md
+LICENSE
+*.log

@@ -1,0 +1,17 @@
+# Local environment files (never commit)
+.env
+.env.*
+!.env.example
+
+# Composer artifacts (installed only inside the image)
+/vendor/
+/web/vendor/
+
+# Editor / OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Test artifacts
+*.log

@@ -1,0 +1,46 @@
+# Local development / smoke-test stack. Mirrors the Railway layout:
+#   web -> this repository (Dockerfile), Drupal 11 + Apache + PostgreSQL
+#   db  -> PostgreSQL 17
+#
+# The database credentials below are LOCAL DEVELOPMENT ONLY (ephemeral named
+# volumes) and must never be used in production. DRUPAL_ACCOUNT_PASS is read
+# from your environment or .env file — there is no default, so first boot
+# fails fast if it is missing (see .env.example).
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: drupal
+      POSTGRES_PASSWORD: drupal
+      POSTGRES_DB: drupal
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drupal -d drupal"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  web:
+    build: .
+    image: drupal-railway-web:smoke
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    environment:
+      # Same shape as Railway Postgres' DATABASE_URL (private URL).
+      DATABASE_URL: postgres://drupal:drupal@db:5432/drupal
+      DRUPAL_SITE_NAME: "Drupal on Railway (local)"
+      DRUPAL_ACCOUNT_NAME: admin
+      DRUPAL_ACCOUNT_MAIL: admin@example.com
+      DRUPAL_ACCOUNT_PASS: ${DRUPAL_ACCOUNT_PASS:?Set DRUPAL_ACCOUNT_PASS in .env or your shell (see README.md)}
+    volumes:
+      - drupal-files:/opt/drupal/web/sites/default/files
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  db-data:
+  drupal-files:
