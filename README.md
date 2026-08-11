@@ -42,6 +42,8 @@ UI" steps, no hardcoded credentials.
 | `railway.toml` | Railway config-as-code (builder + healthcheck) |
 | `docker-compose.yml` | Local stack: Drupal + PostgreSQL (named volumes) |
 | `test.sh` | End-to-end smoke test (also runs in GitHub Actions) |
+| `preflight.sh` | Secret-safe container preflight (installed at `/opt/drupal-railway/preflight.sh`) |
+| `docs/railway-publication.md` | Exact Railway template composer payload |
 
 ## Local development
 
