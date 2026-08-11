@@ -138,7 +138,8 @@ contributed cron jobs that read uploads also need access to the files volume.
    - Healthcheck path: `/health.php` (already in `railway.toml`).
 5. **Create Template**, then share the template URL. Publishing to the
    marketplace also makes open-source templates eligible for Railway's
-   kickback program.
+   kickback program. Exact composer values (variables, volume, healthcheck)
+   live in [docs/railway-publication.md](docs/railway-publication.md).
 
 ## Security notes
 
