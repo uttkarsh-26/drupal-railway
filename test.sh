@@ -117,6 +117,45 @@ docker run --rm --entrypoint php "$image_id" -r 'exit(version_compare($argv[1], 
   || fail "Guzzle $guzzle_version is below the required patched version 7.15.3"
 ok "locked dependencies validate and pass security audit (Guzzle $guzzle_version)"
 
+# Deployment preflight must pass with a valid environment and fail fast (with
+# no secret leakage) when required configuration is missing or malformed.
+preflight_pass() {
+  docker run --rm \
+    -e DRUPAL_ACCOUNT_PASS="$DRUPAL_ACCOUNT_PASS" \
+    -e DATABASE_URL='postgres://drupal:secret@db:5432/drupal' \
+    --entrypoint /opt/drupal-railway/preflight.sh "$image_id" \
+    >"$TMPDIR_TEST/preflight-pass.log" 2>&1
+}
+if preflight_pass; then
+  ok "preflight passes with a valid environment"
+else
+  tail -n 30 "$TMPDIR_TEST/preflight-pass.log"
+  fail "preflight should pass with a valid environment"
+fi
+grep -Fq "RESULT=PASS" "$TMPDIR_TEST/preflight-pass.log" \
+  || fail "preflight did not report RESULT=PASS"
+grep -Fq "$DRUPAL_ACCOUNT_PASS" "$TMPDIR_TEST/preflight-pass.log" \
+  && fail "preflight output leaked the admin password"
+
+if docker run --rm \
+    -e DATABASE_URL='postgres://drupal:secret@db:5432/drupal' \
+    --entrypoint /opt/drupal-railway/preflight.sh "$image_id" \
+    >"$TMPDIR_TEST/preflight-nopass.log" 2>&1; then
+  fail "preflight should fail when DRUPAL_ACCOUNT_PASS is missing"
+else
+  ok "preflight fails when DRUPAL_ACCOUNT_PASS is missing"
+fi
+
+if docker run --rm \
+    -e DRUPAL_ACCOUNT_PASS="$DRUPAL_ACCOUNT_PASS" \
+    -e DATABASE_URL='mysql://user:pass@db:3306/drupal' \
+    --entrypoint /opt/drupal-railway/preflight.sh "$image_id" \
+    >"$TMPDIR_TEST/preflight-baddb.log" 2>&1; then
+  fail "preflight should fail on a non-PostgreSQL DATABASE_URL"
+else
+  ok "preflight rejects a non-PostgreSQL DATABASE_URL"
+fi
+
 "${COMPOSE[@]}" run --rm --no-deps \
   -e PORT=8081 -e DRUPAL_SKIP_DB_WAIT=1 -e DRUPAL_SKIP_INSTALL=1 \
   web sh -c "grep -qx 'Listen 8081' /etc/apache2/ports.conf \

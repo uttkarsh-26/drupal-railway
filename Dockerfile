@@ -30,7 +30,8 @@ COPY drupal/apache-https.conf /etc/apache2/conf-available/drupal-railway-https.c
 RUN a2enconf drupal-railway-https
 
 # Runtime helpers live OUTSIDE the web root so they are never served.
-COPY drupal/env.inc.php drupal/check-db.php drupal/installer.php /opt/drupal-railway/
+COPY drupal/env.inc.php drupal/check-db.php drupal/installer.php preflight.sh /opt/drupal-railway/
+RUN chmod +x /opt/drupal-railway/preflight.sh
 
 # Drupal overlay: env-driven settings + lightweight health endpoint.
 COPY drupal/settings.php /opt/drupal/web/sites/default/settings.php
