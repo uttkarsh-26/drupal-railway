@@ -45,7 +45,8 @@ RUN chmod +x /usr/local/bin/drupal-railway-entrypoint \
 
 # Persistent user content and private operational state. Public files are
 # exposed through the web-root symlink; salt/config state stays outside it.
-VOLUME ["/data"]
+# NOTE: no Dockerfile VOLUME here — Railway rejects that instruction; the
+# volume is attached via Railway (see railway.toml/README).
 
 EXPOSE 80
 
