@@ -73,5 +73,13 @@ if [ -n "${PORT:-}" ] && [ "$PORT" != "80" ]; then
   esac
 fi
 
+# --- 6. Apache MPM hygiene ----------------------------------------------------------
+# Railway's base images can leave multiple MPM modules enabled; Apache aborts
+# with "AH00534: More than one MPM loaded". Keep exactly one (prefork, which
+# the official PHP Apache image expects), then start the server.
+log "ensuring a single Apache MPM (prefork)"
+a2dismod -f mpm_event mpm_worker >/dev/null 2>&1 || true
+a2enmod -f mpm_prefork >/dev/null 2>&1 || true
+
 log "starting Apache"
 exec docker-php-entrypoint "$@"
