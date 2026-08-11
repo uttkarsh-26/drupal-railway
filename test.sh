@@ -105,6 +105,14 @@ if ! "${COMPOSE[@]}" build web >"$BUILD_LOG" 2>&1; then
 fi
 ok "image built"
 
+# Railway's builder rejects Dockerfile VOLUME instructions (observed live:
+# "docker VOLUME at Line 48 is not supported, use Railway Volumes"). Volumes are
+# attached natively via railway.toml / the dashboard. Guard the Dockerfile.
+if grep -nE '^[[:space:]]*VOLUME([[:space:]]|$)' Dockerfile; then
+  fail "Dockerfile contains a VOLUME instruction; Railway's builder rejects it (use Railway Volumes instead)"
+fi
+ok "Dockerfile declares no VOLUME (Railway builder compatibility)"
+
 image_id="drupal-railway-web:smoke"
 docker image inspect "$image_id" >/dev/null 2>&1 || fail "could not resolve the built web image"
 docker run --rm --entrypoint composer "$image_id" validate --strict --no-check-publish >/dev/null \
@@ -163,6 +171,20 @@ fi
     && PORT=8082 /usr/local/bin/drupal-railway-entrypoint sh -c \"grep -qx 'Listen 8082' /etc/apache2/ports.conf && grep -q '<VirtualHost \\*:8082>' /etc/apache2/sites-available/000-default.conf\"" \
   >/dev/null || fail "entrypoint did not adapt Apache to PORT=8081"
 ok "entrypoint repeatedly adapts Apache to Railway's dynamic PORT"
+
+# Railway base images can ship with multiple enabled Apache MPMs; Apache then
+# aborts with "AH00534: More than one MPM loaded" (observed live on Railway).
+# Build the genuinely broken state (event + worker .load symlinks active), then
+# verify the entrypoint collapses the set to a single mpm_prefork before start.
+"${COMPOSE[@]}" run --rm --no-deps \
+  -e PORT=8083 -e DRUPAL_SKIP_DB_WAIT=1 -e DRUPAL_SKIP_INSTALL=1 \
+  web sh -c "a2dismod -f mpm_prefork mpm_event mpm_worker >/dev/null 2>&1 || true
+    ln -sf ../mods-available/mpm_event.load /etc/apache2/mods-enabled/mpm_event.load
+    ln -sf ../mods-available/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.load
+    test -e /etc/apache2/mods-enabled/mpm_event.load && test -e /etc/apache2/mods-enabled/mpm_worker.load || exit 42
+    /usr/local/bin/drupal-railway-entrypoint sh -c 'test -e /etc/apache2/mods-enabled/mpm_prefork.load && test ! -e /etc/apache2/mods-enabled/mpm_event.load && test ! -e /etc/apache2/mods-enabled/mpm_worker.load'" \
+  >/dev/null || fail "entrypoint did not collapse multiple MPMs to a single prefork"
+ok "entrypoint collapses multiple enabled MPMs to a single prefork (Railway fix)"
 
 "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
 "${COMPOSE[@]}" up -d db >/dev/null
