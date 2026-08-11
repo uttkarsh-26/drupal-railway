@@ -1,5 +1,6 @@
 # Drupal 11 on Railway
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/drupal-railway-template)
 [![CI](https://github.com/uttkarsh-26/drupal-railway/actions/workflows/ci.yml/badge.svg)](https://github.com/uttkarsh-26/drupal-railway/actions/workflows/ci.yml)
 
 A production-oriented [Drupal](https://www.drupal.org/) 11 template for
