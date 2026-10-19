@@ -1,7 +1,7 @@
 # drupal-railway: production-oriented Drupal 11 for Railway.
 # Base: official Drupal 11.4.4 / PHP 8.5 Apache image. The multi-architecture
 # digest prevents an upstream tag mutation from silently changing a build.
-FROM drupal:11.4.5-php8.5-apache-bookworm@sha256:c9bd9eba8d5c95044ac4fb6e7dd66579f0d5dae401c9f203211ac3084f32852d
+FROM drupal:11.4.10-php8.5-apache-bookworm@sha256:08516a25020dc6aee76962c775d1d8562fc5284da8cd8327c4f7bcaea4f3a78a
 
 # Composer runs as root during the build and needs generous memory for
 # dependency resolution.
